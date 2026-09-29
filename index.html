@@ -325,6 +325,16 @@
   .pad .txt { font-size: 14px; border: 0; background: none; }
 
   .sheet:not(.pin-sheet) { color-scheme: light; }
+  #signSheet { z-index: 40; }  /* sign-in can open on top of settings */
+  .acct { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px 18px; border: 1px solid var(--panel-line); border-radius: 14px; background: #fff; }
+  .acct-main { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .acct-dot { flex: none; width: 14px; height: 14px; border-radius: 50%; background: #B9B6A6; box-shadow: 0 0 0 4px rgba(0,0,0,.05); }
+  .acct-dot.ok { background: #12A150; box-shadow: 0 0 0 4px rgba(18,161,80,.18); }
+  .acct-dot.warn { background: #E0A100; box-shadow: 0 0 0 4px rgba(224,161,0,.2); }
+  .acct-dot.off { background: var(--danger); box-shadow: 0 0 0 4px rgba(196,35,59,.16); }
+  .acct-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .acct-text b { font-size: 16px; overflow-wrap: anywhere; }
+  .acct-text span { font-size: 13px; color: var(--panel-muted); }
   .toast { position: fixed; left: 50%; top: calc(24px + env(safe-area-inset-top, 0px)); z-index: 26; transform: translateX(-50%); padding: 14px 26px; border-radius: 999px; background: var(--volt); color: var(--ink); font-family: var(--sign); font-weight: 900; font-size: clamp(20px, 3vw, 28px); letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; box-shadow: 0 0 30px rgba(227, 255, 0, .5), 0 10px 30px rgba(0, 0, 0, .4); animation: toastIn .3s cubic-bezier(.2, 1.4, .4, 1); pointer-events: none; }
   @keyframes toastIn { from { transform: translate(-50%, -30px); opacity: 0; } }
   /* sign-up form gate */
@@ -686,7 +696,7 @@
 <div class="gate" id="gate" hidden>
   <div class="gate-card" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="gate-head">
-      <div><h2 id="gateTitle">Enter to play</h2><p>Fill this out, then pull the lever to spin.</p></div>
+      <h2 id="gateTitle">Enter to play</h2>
       <button type="button" class="gate-x" id="gateClose" aria-label="Close the form">✕</button>
     </div>
     <div class="gate-body">
@@ -720,12 +730,27 @@
   <header class="set-head">
     <h2>Booth settings <span class="sync" id="sync"></span></h2>
     <div class="row-actions">
-      <button class="btn" id="signOutBtn" type="button" hidden style="background:transparent;color:var(--cream);border-color:var(--line)">Sign out</button>
       <button class="btn" id="fsBtn" type="button" style="background:transparent;color:var(--cream);border-color:var(--line)">Fullscreen</button>
       <button class="btn onDark" id="doneBtn" type="button">Done — back to wheel</button>
     </div>
   </header>
   <div class="set-body">
+    <section id="cloudSec">
+      <h3>Cloud sync</h3>
+      <div class="acct">
+        <div class="acct-main">
+          <span class="acct-dot" id="acctDot"></span>
+          <div class="acct-text"><b id="acctState">Checking…</b><span id="acctSub"></span></div>
+        </div>
+        <div class="row-actions">
+          <button class="btn primary" id="acctSignIn" type="button" hidden>Sign in</button>
+          <button class="btn" id="acctSync" type="button" hidden>Sync now</button>
+          <button class="btn danger" id="acctSignOut" type="button" hidden>Sign out</button>
+        </div>
+      </div>
+      <p class="help" id="acctHelp">When an iPad is signed in, it shares the same prizes, settings and counts with every other signed-in iPad. Sign out before an iPad goes back to the warehouse. Signing out also clears the booth's data from that iPad.</p>
+    </section>
+
     <section>
       <h3>Game style</h3>
       <div class="modes" id="modes">
@@ -914,7 +939,8 @@
     try { const raw = localStorage.getItem(LS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
   }
   function saveLocal() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ cfg: state.cfg, tally: state.tally })); } catch {}
+    // Also remember which changes haven't reached the cloud yet, so they survive the app being closed.
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ cfg: state.cfg, tally: state.tally, unsent: { cfg: !!dirty.cfg, tally: !!dirty.tally } })); } catch {}
   }
 
   const local = loadLocal();
@@ -928,24 +954,27 @@
 
   // ---------- Cloud sync (artifact db) ----------
   let db = null, cfgRef = null, tallyRef = null;
-  let dirty = { cfg: false, tally: false }, writing = false, flushTimer = null;
+  let dirty = { cfg: !!local?.unsent?.cfg, tally: !!local?.unsent?.tally }, writing = false, flushTimer = null;
   let syncState = "local";
   function setSync(s) {
     syncState = s;
     const el = $("sync");
     const map = {
       local: ["warn", "Saved on this device only"],
+      connecting: ["warn", "Connecting to cloud…"],
       saving: ["warn", "Saving…"],
       ok: ["ok", "Saved to cloud"],
       offline: ["warn", "Offline — saved on this device, will retry"],
     };
     const [cls, txt] = map[s] || map.local;
     el.className = "sync " + cls; el.textContent = txt;
+    if (s === "ok") lastCloudSave = Date.now();
+    try { renderAccountPanel(); } catch {}
   }
   function markDirty(which) {
     dirty[which] = true;
     saveLocal();
-    if (!db) { setSync("local"); return; }
+    if (!db) { setSync(dbConnecting ? "connecting" : "local"); return; }
     setSync("saving");
     clearTimeout(flushTimer);
     flushTimer = setTimeout(flush, which === "tally" ? 150 : 700);
@@ -958,6 +987,7 @@
         if (dirty.cfg) { dirty.cfg = false; try { await cfgRef.set(clone(state.cfg)); } catch (e) { dirty.cfg = true; throw e; } }
         if (dirty.tally) { dirty.tally = false; try { await tallyRef.set(clone(state.tally)); } catch (e) { dirty.tally = true; throw e; } }
       }
+      saveLocal();
       setSync("ok");
     } catch (e) {
       setSync("offline");
@@ -965,14 +995,39 @@
       flushTimer = setTimeout(flush, 15000);
     } finally { writing = false; }
   }
+  let dbConnecting = false, dbRetry = 0;
+  // Status from the cloud's own view: pending changes = still uploading; confirmed by the server = saved.
+  function cloudStatus(meta) {
+    if (!meta || dirty.cfg || dirty.tally) return;
+    if (meta.hasPendingWrites) setSync(navigator.onLine === false ? "offline" : "saving");
+    else if (!meta.fromCache) setSync("ok");
+    else if (navigator.onLine === false) setSync("offline");
+  }
   async function initDb() {
+    if (db) return;   // already connected
+    const wantCloud = !!window.claude || !!(window.KWK_FIREBASE && window.firebase);
+    dbConnecting = wantCloud; if (wantCloud) setSync("connecting");
     try { db = await window.claude?.use?.("db"); } catch { db = null; }
-    if (!db) db = await firebaseDb();  // kiosk build: the booth's own Firebase project
+    if (!db) {
+      const r = await firebaseDb();  // kiosk build: the booth's own Firebase project
+      if (r && r.retry) {           // a hiccup (e.g. Wi-Fi still waking up): keep the game going locally and try again
+        dbConnecting = false; setSync("offline");
+        clearTimeout(initDb.t); initDb.t = setTimeout(initDb, Math.min(60000, 5000 * ++dbRetry));
+        return;
+      }
+      db = r;
+    }
+    dbConnecting = false;
     if (!db) { setSync("local"); return; }
+    dbRetry = 0;
     cfgRef = db.doc("wheel/config");
     tallyRef = db.doc("wheel/tally");
-    setSync("ok");
+    setSync(dirty.cfg || dirty.tally ? "saving" : "ok");
+    if (dirty.cfg || dirty.tally) flush();   // anything changed while we were connecting
+    addEventListener("online", () => { if (dirty.cfg || dirty.tally) flush(); else setSync("ok"); });
+    addEventListener("offline", () => setSync("offline"));
     cfgRef.onSnapshot((s) => {
+      cloudStatus(s.metadata);
       if (!s.exists) { if (!s.metadata?.fromCache) markDirty("cfg"); return; }  // truly empty store: push what this device has
       if (dirty.cfg || writing) return;
       const next = normCfg(clone(s.data()));
@@ -980,6 +1035,7 @@
       state.cfg = next; saveLocal(); applyCfg(); if (!$("settings").hidden) renderSettings();
     }, () => setSync("offline"));
     tallyRef.onSnapshot((s) => {
+      cloudStatus(s.metadata);
       if (!s.exists) { if (state.tally.total && !s.metadata?.fromCache) markDirty("tally"); return; }
       if (dirty.tally || writing) return;
       const next = normTally(clone(s.data()));
@@ -994,9 +1050,11 @@
     const cfg = window.KWK_FIREBASE, fb = window.firebase;
     if (!fb || !cfg || !cfg.apiKey || /PASTE/i.test(cfg.apiKey)) return null;
     try {
-      if (!fb.apps.length) fb.initializeApp(cfg);
+      if (!fb.apps.length) {
+        fb.initializeApp(cfg);
+        try { await fb.firestore().enablePersistence({ synchronizeTabs: true }); } catch {}
+      }
       const fs = fb.firestore();
-      try { await fs.enablePersistence({ synchronizeTabs: true }); } catch {}
       fbAuth = fb.auth();
       let user = await new Promise((res) => { const off = fbAuth.onAuthStateChanged((u) => { off(); res(u); }); });
       if (!user) user = await askSignIn(fbAuth);
@@ -1006,15 +1064,17 @@
         doc(path) {
           const ref = fs.doc(path);
           return {
-            set: (data) => ref.set(data),
-            onSnapshot: (next, err) => ref.onSnapshot((snap) => next({
+            // Firestore keeps the change on the iPad and uploads it as soon as it can, so don't wait on the
+            // server here (on a weak connection that can take ages and would stall syncing).
+            set: (data) => { ref.set(data).catch((e) => { console.warn("Cloud save failed", e); setSync("offline"); }); return Promise.resolve(); },
+            onSnapshot: (next, err) => ref.onSnapshot({ includeMetadataChanges: true }, (snap) => next({
               exists: snap.exists, data: () => snap.data(),
               metadata: { fromCache: snap.metadata.fromCache, hasPendingWrites: snap.metadata.hasPendingWrites },
             }), err),
           };
         },
       };
-    } catch (e) { console.warn("Cloud sync unavailable", e); return null; }
+    } catch (e) { console.warn("Cloud sync not ready, will retry", e); return { retry: true }; }
   }
   function askSignIn(auth) {
     return new Promise((resolve) => {
@@ -1033,10 +1093,59 @@
       $("signSkip").onclick = () => { sheet.hidden = true; resolve(null); };
     });
   }
-  function renderAccount(user) { const b = $("signOutBtn"); b.hidden = false; b.dataset.email = user.email || "staff"; b.textContent = "Sign out"; b.title = "Signed in as " + b.dataset.email; }
-  $("signOutBtn").addEventListener("click", async (e) => {
+  function renderAccount() { renderAccountPanel(); }
+  let lastCloudSave = 0;
+  const fbConfigured = () => !!(window.KWK_FIREBASE && window.firebase && window.KWK_FIREBASE.apiKey && !/PASTE/i.test(window.KWK_FIREBASE.apiKey));
+  function renderAccountPanel() {
+    const dot = $("acctDot"), st = $("acctState"), sub = $("acctSub");
+    const show = (id, on) => { $(id).hidden = !on; };
+    const fmt = (t) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    if (window.claude) {
+      dot.className = "acct-dot " + (syncState === "ok" ? "ok" : "warn");
+      st.textContent = "Synced through claude.ai"; sub.textContent = $("sync").textContent;
+      ["acctSignIn", "acctSync", "acctSignOut"].forEach((id) => show(id, false));
+      $("acctHelp").textContent = "This preview saves to claude.ai. The iPad kiosk app has its own cloud sign-in.";
+      return;
+    }
+    if (!fbConfigured()) {
+      dot.className = "acct-dot off"; st.textContent = "Cloud not set up"; sub.textContent = "Add your Firebase settings to firebase-config.js.";
+      ["acctSignIn", "acctSync", "acctSignOut"].forEach((id) => show(id, false));
+      return;
+    }
+    const user = fbAuth && fbAuth.currentUser;
+    if (user && db) {
+      const cls = syncState === "ok" ? "ok" : syncState === "offline" ? "off" : "warn";
+      dot.className = "acct-dot " + cls;
+      st.textContent = "Signed in as " + (user.email || "booth account");
+      sub.textContent = $("sync").textContent + (lastCloudSave ? " · last saved to cloud " + fmt(lastCloudSave) : "");
+      show("acctSignIn", false); show("acctSync", true); show("acctSignOut", true);
+    } else if (dbConnecting) {
+      dot.className = "acct-dot warn"; st.textContent = "Connecting…"; sub.textContent = "Checking the booth account on this iPad.";
+      show("acctSignIn", false); show("acctSync", false); show("acctSignOut", false);
+    } else if (user) {
+      dot.className = "acct-dot off"; st.textContent = "Signed in as " + (user.email || "booth account") + ", not connected";
+      sub.textContent = "Can't reach the cloud right now. Changes are kept on this iPad and will upload when it reconnects.";
+      show("acctSignIn", false); show("acctSync", true); show("acctSignOut", true);
+    } else {
+      dot.className = "acct-dot off"; st.textContent = "Not signed in";
+      sub.textContent = "Changes are only saved on this iPad. Sign in to share them with the booth's other iPads.";
+      show("acctSignIn", true); show("acctSync", false); show("acctSignOut", false);
+    }
+  }
+  $("acctSignIn").addEventListener("click", async () => {
+    if (fbAuth && !fbAuth.currentUser) { const u = await askSignIn(fbAuth); if (!u) return; }
+    initDb();   // connect now, no restart needed
+  });
+  $("acctSync").addEventListener("click", () => {
+    if (db) { dirty.cfg = true; dirty.tally = true; setSync("saving"); flush(); } else initDb();
+  });
+  $("acctSignOut").addEventListener("click", async (e) => {
     const b = e.currentTarget;
-    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Tap again to sign out"; setTimeout(() => { b.dataset.armed = ""; b.textContent = "Sign out"; }, 4000); return; }
+    if (b.dataset.armed !== "1") {
+      b.dataset.armed = "1";
+      b.textContent = dirty.cfg || dirty.tally ? "Some changes haven't uploaded. Tap again to sign out anyway" : "Tap again to sign out";
+      setTimeout(() => { b.dataset.armed = ""; b.textContent = "Sign out"; }, 4000); return;
+    }
     try { await fbAuth?.signOut(); } catch {}
     try { localStorage.removeItem(LS_KEY); } catch {}   // leave nothing of the booth on this iPad
     location.reload();
@@ -1353,7 +1462,7 @@
     const wasSlots = !!(spin && spin.slots);
     spin = null;
     lastWasAgain = !!prize.again;
-    if (!prize.again) gateUnlocked = false;  // next visitor fills the form again ("Spin again" keeps the same turn)
+    if (!prize.again) { gateUnlocked = false; preloadSoon(1200); }  // next visitor fills the form again ("Spin again" keeps the same turn)
     if (wasSlots && !prize.again) markHits();
     if (wasSlots) setTimeout(() => updateLeds(prize.again ? "Try again" : prize.name), 0);
     rot = ((rot % 360) + 360) % 360;
@@ -1783,20 +1892,44 @@
   let gateUnlocked = false, gateOpenNow = false, gateLoads = 0, gateDoneT = null;
   const gateActive = () => canEmbed && state.cfg.gateOn && /^https?:\/\//i.test(state.cfg.gateUrl);
   const thanksUrl = () => new URL("thanks.html", location.href).href;
+  // Keep a blank copy of the form loading in the background, so the pop-up is instant when the lever is pulled.
+  let gateReadyUrl = "", gateLoading = false, gateRefreshT = null, gatePreT = null;
+  function preconnect(url) {
+    try {
+      const origin = new URL(url).origin;
+      if (document.querySelector(`link[rel="preconnect"][href="${origin}"]`)) return;
+      const l = document.createElement("link"); l.rel = "preconnect"; l.href = origin; l.crossOrigin = ""; document.head.appendChild(l);
+    } catch {}
+  }
+  function preloadGate(force) {
+    clearTimeout(gatePreT);
+    if (!canEmbed || !state.cfg.gateOn || state.cfg.gateMode !== "popup" || !/^https?:\/\//i.test(state.cfg.gateUrl)) return;
+    if (gateOpenNow) return;
+    if (!force && (gateReadyUrl === state.cfg.gateUrl || gateLoading)) return;
+    preconnect(state.cfg.gateUrl);
+    gateReadyUrl = ""; gateLoading = true; gateLoads = 0;
+    $("gateFrame").src = state.cfg.gateUrl;
+    // A form left open for ages can go stale (expired session); swap in a fresh one every 20 minutes while idle.
+    clearTimeout(gateRefreshT); gateRefreshT = setTimeout(() => { if (!gateOpenNow) preloadGate(true); }, 20 * 60 * 1000);
+  }
+  const preloadSoon = (ms = 400) => { clearTimeout(gatePreT); gatePreT = setTimeout(() => preloadGate(true), ms); };
   function openGate(test) {
     if (!/^https?:\/\//i.test(state.cfg.gateUrl)) { notice("> Add the form link in settings first."); return; }
     if (state.cfg.gateMode === "page" && !test) { saveLocal(); location.href = state.cfg.gateUrl; return; }  // thanks.html brings them back unlocked
-    gateOpenNow = true; gateLoads = 0; clearTimeout(gateDoneT);
+    clearTimeout(gateDoneT);
     $("gateDone").hidden = true;
-    const f = $("gateFrame");
-    f.src = "about:blank";
-    setTimeout(() => { f.src = state.cfg.gateUrl; }, 30);  // fresh, empty form every time
+    const ready = gateReadyUrl === state.cfg.gateUrl || (gateLoading && $("gateFrame").getAttribute("src") === state.cfg.gateUrl);
+    if (!ready) { preconnect(state.cfg.gateUrl); gateLoads = 0; gateLoading = true; $("gateFrame").src = state.cfg.gateUrl; }
+    gateOpenNow = true; gateReadyUrl = "";               // this copy is now in use; the next visitor gets a fresh one
+    if (!gateLoading) gateLoads = 1;                      // already loaded in the background: that load counts as page one
     $("gate").hidden = false; $("gate").dataset.test = test ? "1" : "";
   }
   function closeGate() {
     gateOpenNow = false; clearTimeout(gateDoneT);
-    $("gate").hidden = true; $("gateFrame").src = "about:blank";
+    $("gate").hidden = true;
+    $("gateFrame").src = "about:blank"; gateReadyUrl = ""; gateLoading = false;
     lastInteract = performance.now();
+    if (!gateUnlocked) preloadSoon(); else setTimeout(() => { if (!gateUnlocked) preloadGate(); }, 1500);
   }
   function toast(msg) {
     const t = $("toast"); t.textContent = msg; t.hidden = false;
@@ -1821,9 +1954,11 @@
   } catch {}
   $("gateClose").addEventListener("click", closeGate);
   $("gateFrame").addEventListener("load", () => {
-    if (!gateOpenNow || $("gateFrame").src === "about:blank") return;
+    const f = $("gateFrame");
+    if (!f.src || f.src === "about:blank" || f.getAttribute("src") === "about:blank") return;
     gateLoads++;
-    if (state.cfg.gateDetect === "load" && gateLoads >= 2) formDone();   // a second page = the thank-you page
+    if (gateLoading) { gateLoading = false; if (!gateOpenNow) gateReadyUrl = state.cfg.gateUrl; }   // background copy is ready
+    if (gateOpenNow && state.cfg.gateDetect === "load" && gateLoads >= 2) formDone();   // a second page = the thank-you page
   });
   window.addEventListener("message", (e) => {
     if (!gateOpenNow) return;
@@ -1834,10 +1969,10 @@
     // "form submitted" signals sent by common form tools (Typeform, Jotform, HubSpot, Tally, Fillout, and others)
     if (/form[-_ ]?submit|submission[-_ ]?complete|onFormSubmitted|formSubmitted|form_submission|"event":"submit"|Tally\.FormSubmitted/i.test(str)) formDone();
   });
-  $("fGateOn").addEventListener("change", (e) => { state.cfg.gateOn = e.target.checked; cfgChanged({ redraw: false }); renderGateNote(); });
-  $("fGateUrl").addEventListener("input", (e) => { state.cfg.gateUrl = e.target.value.trim(); cfgChanged({ redraw: false }); renderGateNote(); });
+  $("fGateOn").addEventListener("change", (e) => { state.cfg.gateOn = e.target.checked; cfgChanged({ redraw: false }); renderGateNote(); preloadSoon(); });
+  $("fGateUrl").addEventListener("input", (e) => { state.cfg.gateUrl = e.target.value.trim(); cfgChanged({ redraw: false }); renderGateNote(); preloadSoon(1200); });
   $("fGateDetect").addEventListener("change", (e) => { state.cfg.gateDetect = e.target.value; cfgChanged({ redraw: false }); });
-  $("fGateMode").addEventListener("change", (e) => { state.cfg.gateMode = e.target.value; cfgChanged({ redraw: false }); });
+  $("fGateMode").addEventListener("change", (e) => { state.cfg.gateMode = e.target.value; cfgChanged({ redraw: false }); preloadSoon(); });
   $("gateTest").addEventListener("click", () => { if (!canEmbed) { renderGateNote(); return; } openGate(true); });
   function renderGateNote() {
     const n = $("gateUrlNote");
@@ -1887,6 +2022,7 @@
     renderHub($("hub"), true);
     refreshGame();
     applyMode();
+    if (typeof preloadGate === "function" && !gateUnlocked) preloadGate();
   }
   // Size the curved line so it always fits between the arc's ends (measured on a canvas,
   // because SVG's own text measurement leaves out letter-spacing in some browsers).
@@ -1977,7 +2113,7 @@
     $("fSound").checked = !!c.sound;
     $("fPin").value = c.pin || "";
     renderHub($("logoPrev"), false);
-    renderModes(); renderGateSettings();
+    renderModes(); renderGateSettings(); renderAccountPanel();
     const st = $("stage").getBoundingClientRect();
     $("dispInfo").textContent = `Screen ${screen.width}×${screen.height} · window ${innerWidth}×${innerHeight} · felt ${Math.round(st.width)}×${Math.round(st.height)} · ${standalone ? "Home Screen app" : "browser"}`;
     renderPrizeRows(); renderStats(); $("sim").innerHTML = "";
@@ -2165,7 +2301,7 @@
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { drawFace(); fitArc(); });
 
   applyCfg();
-  setSync("local");
+  setSync(window.claude || (window.KWK_FIREBASE && window.firebase) ? "connecting" : "local");
   requestAnimationFrame(frame);
   initDb();
 })();
