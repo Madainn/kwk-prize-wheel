@@ -73,16 +73,15 @@
 
   /* ---------- Stage ---------- */
   .stage {
-    height: 100%;
+    position: fixed; inset: 0;  /* felt runs edge to edge, under the iPad's status bar and home bar */
     display: grid;
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     align-items: center;
     gap: clamp(16px, 4vw, 64px);
     padding-inline: clamp(16px, 4vw, 64px);
-    padding-block: clamp(16px, 3vh, 40px);
+    padding-block: calc(clamp(16px, 3vh, 40px) + env(safe-area-inset-top, 0px)) calc(clamp(16px, 3vh, 40px) + env(safe-area-inset-bottom, 0px));
     box-sizing: border-box;
-    position: relative;
     isolation: isolate;
   }
   /* Casino felt: a spotlit green table, woven grain, and printed table markings */
@@ -100,7 +99,7 @@
   }
   .stage::after { /* printed table line, like the border on a blackjack layout */
     content: ""; position: absolute; z-index: -1; pointer-events: none;
-    inset: clamp(10px, 1.6vw, 22px);
+    inset: calc(clamp(10px, 1.6vw, 22px) + env(safe-area-inset-top, 0px)) clamp(10px, 1.6vw, 22px) calc(clamp(10px, 1.6vw, 22px) + env(safe-area-inset-bottom, 0px));
     border-radius: clamp(28px, 5vw, 72px);
     border: 2px solid rgba(227, 255, 0, .22);
     box-shadow: inset 0 0 0 7px transparent, inset 0 0 0 8px rgba(247, 245, 235, .10), inset 0 0 90px rgba(0, 0, 0, .35);
@@ -210,7 +209,9 @@
     .wheel-col { order: 4; }
     .spin-row { order: 5; padding-block-start: 0; }
     .notice { order: 6; }
-    .arc { width: min(100%, 480px); }
+    .arc { width: min(78%, 420px); }
+    .headline { font-size: clamp(44px, 7vw, 100px); }
+    .eyebrow { font-size: clamp(12px, 1.8vw, 17px); }
   }
 
   /* The spin button is a big casino chip */
@@ -433,22 +434,20 @@
   .lever-arm.release { transition: transform .35s cubic-bezier(.3, 1.6, .5, 1); }
   .cab { display: flex; flex-direction: column; align-items: center; }
 
-  /* topper: chrome-rimmed arch with the logo under glass */
-  .topper { width: 100%; height: calc(var(--s) * .34); box-sizing: border-box; padding: calc(var(--s) * .016); background: var(--chrome); border-radius: calc(var(--s) * .24) calc(var(--s) * .24) calc(var(--s) * .02) calc(var(--s) * .02); }
-  .marquee {
-    position: relative; height: 100%; box-sizing: border-box; overflow: hidden;
-    border-radius: calc(var(--s) * .225) calc(var(--s) * .225) calc(var(--s) * .01) calc(var(--s) * .01);
-    background: radial-gradient(ellipse 70% 95% at 50% 62%, #45157A 0%, #1C0934 55%, #0B0F0D 100%);
-    box-shadow: inset 0 0 calc(var(--s) * .035) rgba(0, 0, 0, .85), inset 0 0 0 calc(var(--s) * .004) rgba(227, 255, 0, .3);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .marquee::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(165deg, rgba(255,255,255,.2) 0%, rgba(255,255,255,.04) 38%, rgba(255,255,255,0) 39%); }
-  .marquee .brand { position: relative; z-index: 1; height: calc(var(--s) * .21); margin-top: calc(var(--s) * .02); display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 0 calc(var(--s) * .025) rgba(227, 255, 0, .45)); }
-  .marquee .brand img { height: calc(var(--s) * .21); width: auto; max-width: calc(var(--s) * .8); object-fit: contain; }
+  /* crown: a big LED-ringed circle joined to the cabinet by a short neck */
+  .crown { position: relative; z-index: 2; width: calc(var(--s) * .66); height: calc(var(--s) * .66); margin-bottom: calc(var(--s) * -.05); }
+  .marquee { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, #202127 58%, #0B0C0E 74%); box-shadow: 0 0 0 calc(var(--s) * .012) var(--volt), 0 0 calc(var(--s) * .06) calc(var(--s) * .008) rgba(227, 255, 0, .5), inset 0 0 0 calc(var(--s) * .01) #2C2D33; }
+  .ring-face { position: absolute; inset: 11.5%; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: radial-gradient(circle at 50% 42%, #6A22A8, #34105C 55%, #12051F 100%); box-shadow: 0 0 0 calc(var(--s) * .008) var(--pink), 0 0 calc(var(--s) * .04) rgba(255, 153, 252, .55), inset 0 0 calc(var(--s) * .06) rgba(0, 0, 0, .7); }
+  .ring-face::before { content: ""; position: absolute; inset: 0; background: repeating-conic-gradient(rgba(255, 255, 255, .06) 0 6deg, transparent 6deg 12deg); }
+  .ring-face::after { content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none; background: linear-gradient(160deg, rgba(255,255,255,.2) 0%, rgba(255,255,255,.04) 40%, rgba(255,255,255,0) 41%); }
+  .marquee .brand { position: relative; z-index: 1; display: grid; place-items: center; filter: drop-shadow(0 0 calc(var(--s) * .03) rgba(227, 255, 0, .5)); }
+  .marquee .brand img { width: calc(var(--s) * .5); height: auto; max-height: calc(var(--s) * .44); object-fit: contain; }
+  .neck { position: relative; z-index: 1; width: calc(var(--s) * .3); height: calc(var(--s) * .07); background: linear-gradient(90deg, #0D0E10, #2C2D33 50%, #0D0E10); box-shadow: inset calc(var(--s) * .006) 0 0 var(--volt), inset calc(var(--s) * -.006) 0 0 var(--volt); }
   .slot-word { font-weight: 900; color: var(--volt); text-transform: uppercase; font-size: calc(var(--s) * .09); line-height: 1; letter-spacing: -.01em; display: flex; align-items: center; gap: .22em; }
   .slot-word small { font-family: var(--mono); font-weight: 700; font-size: .36em; color: var(--pink); letter-spacing: .08em; }
+  .slot-word.stack { flex-direction: column; gap: .08em; font-size: calc(var(--s) * .12); line-height: .9; text-align: center; }
   .sb {
-    position: absolute; z-index: 1; width: calc(var(--s) * .022); height: calc(var(--s) * .022); border-radius: 50%; transform: translate(-50%, -50%);
+    position: absolute; z-index: 1; width: calc(var(--s) * .026); height: calc(var(--s) * .026); border-radius: 50%; transform: translate(-50%, -50%);
     background: radial-gradient(circle at 38% 32%, #77774C, #33331F 70%);
     box-shadow: 0 0 0 calc(var(--s) * .004) #C9CAC3, 0 0 0 calc(var(--s) * .006) #5E5F59;
     transition: background .06s, box-shadow .06s;
@@ -457,21 +456,22 @@
   .sb.on2 { background: radial-gradient(circle at 38% 32%, #FFE9FF, var(--pink) 55%, #C35BC0); box-shadow: 0 0 0 calc(var(--s) * .004) #C9CAC3, 0 0 0 calc(var(--s) * .006) #5E5F59, 0 0 calc(var(--s) * .022) var(--pink); }
   .sb.dim { background: radial-gradient(circle at 38% 32%, #D4E36A, #92A320 70%); }
 
-  .trim { width: 100%; height: calc(var(--s) * .018); background: var(--chrome); border-radius: calc(var(--s) * .006); position: relative; z-index: 1; }
 
-  /* body: curved purple front with a lit sheen down the middle */
+  /* body: dark cabinet edged in volt LED trim, with a tall glowing screen */
   .cab-body {
     width: 100%; box-sizing: border-box; position: relative;
-    background:
-      linear-gradient(90deg, rgba(0,0,0,.42) 0%, rgba(255,255,255,.05) 14%, rgba(255,255,255,.16) 50%, rgba(255,255,255,.05) 86%, rgba(0,0,0,.42) 100%),
-      linear-gradient(180deg, #9B3EE0, var(--purple) 40%, #57158A);
-    padding: calc(var(--s) * .035) calc(var(--s) * .05) calc(var(--s) * .035);
-    display: flex; flex-direction: column; gap: calc(var(--s) * .03);
+    border-radius: calc(var(--s) * .05) calc(var(--s) * .05) calc(var(--s) * .02) calc(var(--s) * .02);
+    background: linear-gradient(90deg, #0C0D0F 0%, #26272D 18%, #34353C 50%, #26272D 82%, #0C0D0F 100%);
+    padding: calc(var(--s) * .04) calc(var(--s) * .04) calc(var(--s) * .03);
+    display: flex; flex-direction: column; gap: calc(var(--s) * .025);
+    box-shadow: 0 0 0 calc(var(--s) * .008) var(--volt), 0 0 calc(var(--s) * .045) rgba(227, 255, 0, .42), inset 0 calc(var(--s) * .01) 0 rgba(255,255,255,.08);
   }
-  .bezel { padding: calc(var(--s) * .016); background: var(--chrome); border-radius: calc(var(--s) * .035); box-shadow: 0 calc(var(--s) * .008) calc(var(--s) * .016) rgba(0, 0, 0, .45); }
-  .window { position: relative; background: #050706; border-radius: calc(var(--s) * .022); padding: calc(var(--s) * .012); box-shadow: inset 0 0 calc(var(--s) * .02) #000; }
+  .screen { position: relative; border-radius: calc(var(--s) * .03); padding: calc(var(--s) * .022); display: flex; flex-direction: column; gap: calc(var(--s) * .022); background: linear-gradient(180deg, #2A0B4D, #12051F); box-shadow: 0 0 0 calc(var(--s) * .008) var(--pink), 0 0 calc(var(--s) * .04) rgba(255, 153, 252, .5), inset 0 0 calc(var(--s) * .03) rgba(0, 0, 0, .6); }
+  .title-art { position: relative; overflow: hidden; height: calc(var(--s) * .1); border-radius: calc(var(--s) * .018); display: flex; align-items: center; justify-content: center; gap: calc(var(--s) * .03); background: repeating-conic-gradient(from -90deg at 50% 120%, #7A22BD 0 5deg, #5D1893 5deg 10deg); box-shadow: inset 0 0 calc(var(--s) * .03) rgba(0, 0, 0, .5); }
+  .title-art .ta { font-family: var(--mono); font-weight: 700; color: var(--volt); font-size: calc(var(--s) * .052); white-space: nowrap; text-shadow: 0 0 calc(var(--s) * .025) rgba(227, 255, 0, .7); }
+  .window { position: relative; background: #050706; border-radius: calc(var(--s) * .02); padding: calc(var(--s) * .012); box-shadow: inset 0 0 calc(var(--s) * .02) #000, 0 0 0 calc(var(--s) * .004) rgba(227, 255, 0, .35); }
   .window::after { content: ""; position: absolute; inset: calc(var(--s) * .012); z-index: 2; pointer-events: none; border-radius: calc(var(--s) * .014); background: linear-gradient(160deg, rgba(255,255,255,.3) 0%, rgba(255,255,255,.07) 26%, rgba(255,255,255,0) 27%); }
-  .reels { --cell: 60px; display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--s) * .014); height: calc(var(--s) * .42); }
+  .reels { --cell: 60px; display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--s) * .014); height: calc(var(--s) * .41); }
   .reel { position: relative; overflow: hidden; border-radius: calc(var(--s) * .01); background: var(--cream); }
   .reel::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,.62), rgba(0,0,0,.06) 26%, rgba(255,255,255,.1) 50%, rgba(0,0,0,.06) 74%, rgba(0,0,0,.62)); }
   .strip { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }
@@ -489,8 +489,8 @@
   @keyframes cellHit { 50% { background: var(--volt); } }
   .payline { position: absolute; left: calc(var(--s) * .012); right: calc(var(--s) * .012); top: 50%; z-index: 3; height: calc(var(--s) * .004); background: var(--volt); transform: translateY(-50%); opacity: .5; box-shadow: 0 0 calc(var(--s) * .01) var(--volt); pointer-events: none; }
   .payline::before, .payline::after { content: ""; position: absolute; top: 50%; width: calc(var(--s) * .026); height: calc(var(--s) * .026); border-radius: 50%; transform: translateY(-50%); background: radial-gradient(circle at 38% 32%, #FBFFD0, var(--volt) 60%); box-shadow: 0 0 calc(var(--s) * .015) var(--volt); }
-  .payline::before { left: calc(var(--s) * -.043); }
-  .payline::after { right: calc(var(--s) * -.043); }
+  .payline::before { left: calc(var(--s) * -.034); }
+  .payline::after { right: calc(var(--s) * -.034); }
 
   /* meters */
   .leds { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--s) * .02); }
@@ -536,13 +536,13 @@
   .belly .tag { font-family: var(--felt); font-weight: 700; color: var(--cream); letter-spacing: .34em; font-size: calc(var(--s) * .032); text-transform: uppercase; text-shadow: 0 calc(var(--s) * .003) 0 rgba(0,0,0,.5); }
   .belly code { font-family: var(--mono); font-weight: 700; color: var(--volt); font-size: calc(var(--s) * .03); background: rgba(11, 15, 13, .55); padding: .3em .9em; border-radius: 999px; }
 
-  /* coin tray + base */
-  .tray { width: 84%; height: calc(var(--s) * .07); box-sizing: border-box; padding: 0 calc(var(--s) * .012) calc(var(--s) * .012); background: var(--chrome); border-radius: 0 0 calc(var(--s) * .045) calc(var(--s) * .045); }
-  .tray-in { height: 100%; border-radius: 0 0 calc(var(--s) * .035) calc(var(--s) * .035); background: radial-gradient(ellipse 80% 120% at 50% 0%, #000 30%, #222 100%); box-shadow: inset 0 calc(var(--s) * .012) calc(var(--s) * .02) #000; }
-  .base { width: 94%; height: calc(var(--s) * .05); margin-top: calc(var(--s) * .01); background: linear-gradient(180deg, #232326, #060607); border-radius: calc(var(--s) * .012) calc(var(--s) * .012) calc(var(--s) * .02) calc(var(--s) * .02); box-shadow: inset 0 calc(var(--s) * .006) 0 rgba(255,255,255,.12); }
+  /* deck, glass strip and base, restyled for the dark cabinet */
+  .deck { background: linear-gradient(180deg, #1D1E22, #0C0D0F); border-radius: calc(var(--s) * .025); box-shadow: inset 0 calc(var(--s) * .006) 0 rgba(255,255,255,.1), 0 0 0 calc(var(--s) * .004) rgba(227, 255, 0, .3); padding-block: calc(var(--s) * .018) calc(var(--s) * .014); }
+  .belly { height: calc(var(--s) * .075); background: #070808; box-shadow: inset 0 0 0 calc(var(--s) * .004) #2E2F2B, 0 0 0 calc(var(--s) * .004) rgba(255, 153, 252, .35); }
+  .base { width: 92%; height: calc(var(--s) * .06); background: linear-gradient(180deg, #1B1C20, #060607); border-radius: 0 0 calc(var(--s) * .03) calc(var(--s) * .03); box-shadow: inset 0 calc(var(--s) * -.008) 0 var(--pink), 0 calc(var(--s) * .01) calc(var(--s) * .03) rgba(255, 153, 252, .35); }
 
   /* lever hangs off the right side so the cabinet itself stays centred */
-  .lever { position: absolute; left: 100%; top: calc(var(--s) * .34); width: calc(var(--s) * .12); height: calc(var(--s) * .5); pointer-events: auto; }
+  .lever { position: absolute; left: 100%; top: calc(var(--s) * .72); width: calc(var(--s) * .12); height: calc(var(--s) * .5); pointer-events: auto; }
   .lever-mount { position: absolute; left: calc(var(--s) * -.004); top: calc(var(--s) * .27); width: calc(var(--s) * .06); height: calc(var(--s) * .1); background: var(--chrome); border-radius: 0 calc(var(--s) * .03) calc(var(--s) * .03) 0; box-shadow: calc(var(--s) * .006) calc(var(--s) * .006) calc(var(--s) * .012) rgba(0,0,0,.4); }
   .lever-arm { position: absolute; left: calc(var(--s) * .026); top: calc(var(--s) * .04); width: calc(var(--s) * .024); height: calc(var(--s) * .28); transform-origin: 50% 100%; background: var(--chrome-x); border-radius: 99px; }
   .lever-ball { position: absolute; left: 50%; top: 0; width: calc(var(--s) * .09); height: calc(var(--s) * .09); transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle at 34% 28%, #FFFFFF 0 6%, #FFD3FE 14%, var(--pink) 45%, #B24BAF 85%); box-shadow: 0 calc(var(--s) * .01) calc(var(--s) * .02) rgba(0, 0, 0, .45); }
@@ -597,10 +597,11 @@
     </div>
     <div class="slot" id="slot" role="button" tabindex="0" aria-label="Pull the slot machine" hidden>
       <div class="cab">
-        <div class="topper"><div class="marquee" id="marquee"><div class="brand" id="slotBrand"></div></div></div>
-        <div class="trim"></div>
+        <div class="crown"><div class="marquee" id="marquee"><div class="ring-face"><div class="brand" id="slotBrand"></div></div></div></div>
+        <div class="neck"></div>
         <div class="cab-body">
-          <div class="bezel">
+          <div class="screen">
+            <div class="title-art" aria-hidden="true"><span class="belly-chip" style="--c: var(--pink)"></span><code class="ta">slots.spin()</code><span class="belly-chip" style="--c: var(--blue)"></span></div>
             <div class="window">
               <div class="reels" id="reels">
                 <div class="reel"><div class="strip"></div></div>
@@ -609,20 +610,17 @@
               </div>
               <div class="payline"></div>
             </div>
-          </div>
-          <div class="leds">
-            <div class="led"><small>SPINS</small><b id="ledSpins">0</b></div>
-            <div class="led"><small>WIN</small><b id="ledWin">—</b></div>
+            <div class="leds">
+              <div class="led"><small>SPINS</small><b id="ledSpins">0</b></div>
+              <div class="led"><small>WIN</small><b id="ledWin">—</b></div>
+            </div>
           </div>
           <div class="deck">
             <button type="button" class="abtn" id="btnBet" aria-label="Change the light show"><span class="dome"></span><span class="lbl">BET</span></button>
             <button type="button" class="abtn volt big" id="btnSpin" aria-label="Spin"><span class="dome"></span><span class="lbl">SPIN</span></button>
             <button type="button" class="abtn blue" id="btnMax" aria-label="Max bet and spin"><span class="dome"></span><span class="lbl">MAX</span></button>
           </div>
-          <div class="belly" aria-hidden="true"><span class="belly-chip" style="--c: var(--pink)"></span><code>slots.spin()</code><span class="belly-chip" style="--c: var(--blue)"></span></div>
         </div>
-        <div class="trim"></div>
-        <div class="tray"><div class="tray-in"></div></div>
         <div class="base"></div>
       </div>
       <div class="lever" id="lever"><div class="lever-mount"></div><div class="lever-arm"><div class="lever-ball"></div></div></div>
@@ -1407,28 +1405,22 @@
   let cellPx = 60, reelKey = "", slotLight = 0;
 
   // Marquee bulbs, laid out evenly around the marquee's rounded outline, starting top-centre.
+  // Medallion bulbs: an even ring just inside the chrome rim, starting at the top.
   const slotBulbEls = (function makeSlotBulbs() {
-    const m = $("marquee"), W = 96.8, H = 30.8, ins = 2.6, rt = 19.5, rb = 1;  // marquee inner box, in hundredths of the cabinet width
-    const x0 = ins, x1 = W - ins, y0 = ins, y1 = H - ins;
-    const d = `M ${W / 2} ${y0} H ${x1 - rt} A ${rt} ${rt} 0 0 1 ${x1} ${y0 + rt} V ${y1 - rb} A ${rb} ${rb} 0 0 1 ${x1 - rb} ${y1} H ${x0 + rb} A ${rb} ${rb} 0 0 1 ${x0} ${y1 - rb} V ${y0 + rt} A ${rt} ${rt} 0 0 1 ${x0 + rt} ${y0} Z`;
-    const NS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(NS, "svg"); svg.setAttribute("width", "0"); svg.setAttribute("height", "0"); svg.style.position = "absolute";
-    const path = document.createElementNS(NS, "path"); path.setAttribute("d", d); svg.appendChild(path); document.body.appendChild(svg);
-    const len = path.getTotalLength(), els = [];
+    const m = $("marquee"), els = [];
     for (let i = 0; i < N; i++) {
-      const pt = path.getPointAtLength((len * i) / N);
+      const a = -Math.PI / 2 + (i * Math.PI * 2) / N;
       const b = document.createElement("span"); b.className = "sb";
-      b.style.left = (pt.x / W * 100).toFixed(2) + "%"; b.style.top = (pt.y / H * 100).toFixed(2) + "%";
+      b.style.left = (50 + 43.5 * Math.cos(a)).toFixed(2) + "%"; b.style.top = (50 + 43.5 * Math.sin(a)).toFixed(2) + "%";
       m.appendChild(b); els.push(b);
     }
-    svg.remove();
     return els;
   })();
 
   function renderSlotBrand() {
     const el = $("slotBrand");
     if (state.cfg.logo) { el.innerHTML = ""; const img = new Image(); img.alt = "Kode With Klossy"; img.src = state.cfg.logo; el.appendChild(img); }
-    else el.innerHTML = `<div class="slot-word">Kode <small>with</small> Klossy</div>`;
+    else el.innerHTML = `<div class="slot-word stack">Kode<small>with</small>Klossy</div>`;
   }
 
   // Reel strips reuse the wheel's slice list, so likelier prizes appear on the reels more often.
@@ -1451,7 +1443,19 @@
     });
     paintReels();
   }
+  // Scale the whole machine so it always fits inside the felt border, whatever the screen shape.
+  function fitSlot() {
+    const el = $("slot"); if (el.hidden) return;
+    const col = el.parentElement.getBoundingClientRect();
+    const w = el.getBoundingClientRect().width, h = el.getBoundingClientRect().height;
+    if (!w || !h || !col.width || !col.height) return;
+    const perWidth = h / w;                                   // machine height per unit of width
+    const room = innerHeight > innerWidth ? 0.985 : 0.93;          // landscape leaves space for the ring's glow
+    const s = Math.max(120, Math.min(col.width * 0.86, (col.height * room) / perWidth));
+    if (Math.abs(s - w) > 1) el.style.setProperty("--s", s.toFixed(1) + "px");
+  }
   function measureReels() {
+    fitSlot();
     const h = reelEls[0].clientHeight;
     if (h) { cellPx = h / 3; $("reels").style.setProperty("--cell", cellPx.toFixed(2) + "px"); }
     paintReels();
@@ -1981,7 +1985,7 @@
 
   let resizeT = null;
   const ro = new ResizeObserver(() => { clearTimeout(resizeT); resizeT = setTimeout(() => { drawFace(); measureReels(); }, 60); });
-  ro.observe(face); ro.observe($("reels"));
+  ro.observe(face); ro.observe($("reels")); ro.observe(document.querySelector(".wheel-col"));
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { drawFace(); fitArc(); });
 
   applyCfg();
