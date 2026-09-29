@@ -2,20 +2,29 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Thanks!</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>One moment…</title>
 <style>
-  html, body { height: 100%; margin: 0; }
-  body { display: grid; place-content: center; gap: 8px; text-align: center; background: #015F45; color: #F7F5EB; font: 600 20px system-ui, -apple-system, sans-serif; }
-  b { font-size: 56px; color: #E3FF00; letter-spacing: .02em; text-transform: uppercase; }
+  html, body { height: 100%; margin: 0; background: #013D2D; }
+  body { display: grid; place-content: center; color: #A9C9BC; font: 600 18px system-ui, -apple-system, sans-serif; }
 </style>
 </head>
 <body>
-<b>You're in!</b>
-<span>Head back to the machine and pull the lever.</span>
+<span>One moment…</span>
 <script>
-  // Point your form's "redirect after submit" here. Inside the kiosk, this tells the game the form is done.
-  try { parent.postMessage({ kwk: "form-done" }, location.origin); } catch (e) {}
+  // Point your form's "redirect after submit" here. It unlocks the kiosk's spin and returns to the game.
+  (function () {
+    var framed = true;
+    try { framed = window.self !== window.top; } catch (e) {}
+    if (framed) {
+      // Shown inside the kiosk's form pop-up: tell the game (it closes the pop-up itself).
+      try { window.parent.postMessage({ kwk: "form-done" }, "*"); } catch (e) {}
+      try { window.top.postMessage({ kwk: "form-done" }, "*"); } catch (e) {}
+    } else {
+      // The redirect took over the whole app: go straight back to the machine, unlocked.
+      location.replace("./?kwkUnlocked=" + Date.now());
+    }
+  })();
 </script>
 </body>
 </html>
