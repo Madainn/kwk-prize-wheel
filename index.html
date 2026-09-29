@@ -811,7 +811,6 @@
         <div class="field"><span class="lbl">Options</span>
           <label class="chk"><input id="fShowOut" type="checkbox"> Keep out-of-stock prizes on the wheel</label>
           <label class="chk"><input id="fSound" type="checkbox"> Tick &amp; win sounds</label>
-          <label class="chk"><input id="fAutoFs" type="checkbox"> Stay fullscreen: any tap on the game screen goes fullscreen (hides the Claude bar)</label>
         </div>
         <div class="field"><span class="lbl">Center logo</span>
           <div class="logo-row">
@@ -861,7 +860,7 @@
     lede: "Tap the wheel or hit spin. One spin per visitor — good luck!",
     slotTitle: "Play to *win*",
     slotLede: "Tap the machine or pull the lever. Good luck!",
-    mode: "wheel", gateOn: false, gateUrl: "", gateDetect: "auto", minSlices: 12, duration: 6.5, showOut: false, sound: true, autoFs: true, pin: "1234", logo: null,
+    mode: "wheel", gateOn: false, gateUrl: "", gateDetect: "auto", minSlices: 12, duration: 6.5, showOut: false, sound: true, pin: "1234", logo: null,
     prizes: [
       { id: "p1", name: "KWK Hoodie", color: "purple", weight: 1, stock: 10, again: false },
       { id: "p2", name: "Tote Bag", color: "volt", weight: 5, stock: 60, again: false },
@@ -1636,8 +1635,8 @@
   // Fullscreen (and sound) can only be switched on from inside a real tap, so ask on touch-down and
   // touch-up anywhere on the game screen: the first touch goes fullscreen, and so does the next touch
   // after the iPad drops out of it. The spin itself never waits on this.
-  const wantFs = () => !standalone && state.cfg.autoFs !== false && !isFs() && $("settings").hidden && $("pinSheet").hidden;
-  ["pointerdown", "touchend", "click"].forEach((ev) => $("stage").addEventListener(ev, () => { audio(); if (wantFs()) enterFs(); }, { capture: true, passive: true }));
+  // Sound can only start from inside a real tap, so switch it on at the first touch on the game screen.
+  ["pointerdown", "touchend", "click"].forEach((ev) => $("stage").addEventListener(ev, () => { audio(); }, { capture: true, passive: true }));
   function pullLever() { const l = $("lever"); l.classList.remove("pull"); void l.offsetWidth; l.classList.add("pull"); }
   function clunk() {
     const a = audio(); if (!a) return;
@@ -1948,7 +1947,7 @@
     if (!req || isFs()) return isFs();
     try { await req.call(el); return true; } catch { return false; }
   }
-  if (standalone) { $("fsBtn").hidden = true; $("fAutoFs").closest("label").hidden = true; }  // already full screen as a Home Screen app
+  if (standalone) { $("fsBtn").hidden = true; }  // already full screen as a Home Screen app
   $("fsBtn").addEventListener("click", async () => {
     if (isFs()) { try { await (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch {} return; }
     if (!(await enterFs())) $("fsBtn").textContent = "Fullscreen not available here";
@@ -1970,7 +1969,6 @@
     $("fDur").value = String(c.duration);
     $("fShowOut").checked = !!c.showOut;
     $("fSound").checked = !!c.sound;
-    $("fAutoFs").checked = c.autoFs !== false;
     $("fPin").value = c.pin || "";
     renderHub($("logoPrev"), false);
     renderModes(); renderGateSettings();
@@ -2079,7 +2077,6 @@
   $("fDur").addEventListener("change", (e) => { state.cfg.duration = Number(e.target.value); cfgChanged({ redraw: false }); });
   $("fShowOut").addEventListener("change", (e) => { state.cfg.showOut = e.target.checked; cfgChanged(); });
   $("fSound").addEventListener("change", (e) => { state.cfg.sound = e.target.checked; cfgChanged({ redraw: false }); });
-  $("fAutoFs").addEventListener("change", (e) => { state.cfg.autoFs = e.target.checked; cfgChanged({ redraw: false }); });
   $("fPin").addEventListener("input", (e) => {
     const v = e.target.value.replace(/\D/g, "").slice(0, 4); e.target.value = v;
     if (v.length === 4 || v.length === 0) { state.cfg.pin = v; cfgChanged({ redraw: false }); }
