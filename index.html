@@ -60,7 +60,7 @@
   html { background: var(--ground-deep); }
   /* iPad Home Screen app: iOS draws the page under the status bar but still sizes the screen without it,
      which leaves a strip at the bottom. Stretch every full-screen layer down by that amount. */
-  html.pwa .stage, html.pwa .result, html.pwa #confetti, html.pwa .sheet, html.pwa .gate { bottom: calc(-1 * var(--pwa-gap, 0px)); }
+  html.pwa .stage, html.pwa .result, html.pwa #confetti, html.pwa .sheet, html.pwa .gate { top: 0; bottom: auto; height: var(--screen-h, 100%); }
   html.pwa #confetti { height: auto; }
   body {
     background: var(--ground-deep);  /* matches the felt's darker edge in case any sliver shows */
@@ -827,6 +827,7 @@
           </div>
           <span class="sub">A square PNG with a transparent background looks best.</span>
         </div>
+        <div class="field"><span class="lbl">Display check</span><span class="sub" id="dispInfo"></span></div>
         <div class="field"><label for="fPin">Staff PIN (4 digits, blank = no PIN)</label><input id="fPin" type="text" inputmode="numeric" maxlength="4" pattern="[0-9]*"></div>
       </div>
     </section>
@@ -928,17 +929,16 @@
   };
   const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches;
   if (standalone) document.documentElement.classList.add("pwa");
-  // The Home Screen app reports a screen that's shorter than the real one (by the status bar), so full-screen
-  // layers stop short at the bottom. Measure the shortfall and stretch them by exactly that much.
+  // The Home Screen app gives the page a viewport shorter than the real screen (by the status bar), and the
+  // number it reports can change after launch. So size full-screen layers to the physical screen instead.
   function measurePwaGap() {
     if (!standalone) return;
     const portrait = matchMedia("(orientation: portrait)").matches;
-    const full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
-    const gap = Math.round(full - window.innerHeight);
-    document.documentElement.style.setProperty("--pwa-gap", (gap > 0 && gap < 90 ? gap : 0) + "px");
+    const h = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+    document.documentElement.style.setProperty("--screen-h", h + "px");
   }
   measurePwaGap();
-  addEventListener("resize", measurePwaGap); addEventListener("orientationchange", () => setTimeout(measurePwaGap, 300));
+  matchMedia("(orientation: portrait)").addEventListener("change", () => { measurePwaGap(); setTimeout(measurePwaGap, 400); });
 
   // ---------- Cloud sync (artifact db) ----------
   let db = null, cfgRef = null, tallyRef = null;
@@ -1992,6 +1992,8 @@
     $("fPin").value = c.pin || "";
     renderHub($("logoPrev"), false);
     renderModes(); renderGateSettings();
+    const st = $("stage").getBoundingClientRect();
+    $("dispInfo").textContent = `Screen ${screen.width}×${screen.height} · window ${innerWidth}×${innerHeight} · felt ${Math.round(st.width)}×${Math.round(st.height)} · ${standalone ? "Home Screen app" : "browser"}`;
     renderPrizeRows(); renderStats(); $("sim").innerHTML = "";
   }
 
