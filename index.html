@@ -58,6 +58,10 @@
   [hidden] { display: none !important; }
   html, body { height: 100%; }
   html { background: var(--ground-deep); }
+  /* iPad Home Screen app: iOS draws the page under the status bar but still sizes the screen without it,
+     which leaves a strip at the bottom. Stretch every full-screen layer down by that amount. */
+  html.pwa .stage, html.pwa .result, html.pwa #confetti, html.pwa .sheet { bottom: calc(-1 * env(safe-area-inset-top, 0px)); }
+  html.pwa #confetti { height: auto; }
   body {
     background: var(--ground-deep);  /* matches the felt's darker edge in case any sliver shows */
     color: var(--cream);
@@ -75,7 +79,6 @@
   /* ---------- Stage ---------- */
   .stage {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;  /* felt runs edge to edge, under the iPad's status bar and home bar */
-    min-height: 100lvh;
     display: grid;
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
@@ -869,6 +872,7 @@
     tally: normTally(local?.tally || SEED?.tally || DEFAULT_TALLY),
   };
   const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches;
+  if (standalone) document.documentElement.classList.add("pwa");
 
   // ---------- Cloud sync (artifact db) ----------
   let db = null, cfgRef = null, tallyRef = null;
