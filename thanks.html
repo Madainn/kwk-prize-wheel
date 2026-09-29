@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thanks!</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { display: grid; place-content: center; gap: 8px; text-align: center; background: #015F45; color: #F7F5EB; font: 600 20px system-ui, -apple-system, sans-serif; }
+  b { font-size: 56px; color: #E3FF00; letter-spacing: .02em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<b>You're in!</b>
+<span>Head back to the machine and pull the lever.</span>
+<script>
+  // Point your form's "redirect after submit" here. Inside the kiosk, this tells the game the form is done.
+  try { parent.postMessage({ kwk: "form-done" }, location.origin); } catch (e) {}
+</script>
+</body>
+</html>

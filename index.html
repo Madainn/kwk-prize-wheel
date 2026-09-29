@@ -328,7 +328,20 @@
   .pad button:active { background: var(--volt); color: var(--ink); }
   .pad .txt { font-size: 14px; border: 0; background: none; }
 
-  .sheet:not(.pin-sheet) { color-scheme: light; }  /* light form controls on the light settings panel */
+  .sheet:not(.pin-sheet) { color-scheme: light; }
+  /* sign-up form gate */
+  .gate { position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; background: rgba(1, 20, 15, .82); padding-inline: 16px; padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)); animation: fade .2s ease-out; }
+  html.pwa .gate { bottom: calc(-1 * env(safe-area-inset-top, 0px)); }
+  .gate-card { width: min(860px, 100%); height: min(88vh, 1100px); display: flex; flex-direction: column; border-radius: 22px; overflow: hidden; background: var(--cream); box-shadow: 0 0 0 4px var(--volt), 0 0 40px rgba(227, 255, 0, .35), 0 20px 60px rgba(0, 0, 0, .5); }
+  .gate-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; background: var(--ground); color: var(--cream); }
+  .gate-head h2 { margin: 0; font-family: var(--sign); font-weight: 900; text-transform: uppercase; letter-spacing: .03em; font-size: clamp(26px, 4vw, 38px); line-height: 1; }
+  .gate-head p { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+  .gate-x { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: rgba(0,0,0,.15); font-size: 18px; }
+  .gate-body { position: relative; flex: 1; min-height: 0; background: #fff; }
+  .gate-body iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .gate-done { position: absolute; inset: 0; display: grid; place-content: center; gap: 8px; text-align: center; background: var(--ground); color: var(--cream); }
+  .gate-done b { font-family: var(--sign); font-weight: 900; font-size: clamp(48px, 9vw, 96px); color: var(--volt); text-transform: uppercase; line-height: 1; }
+  .gate-done span { font-size: 20px; color: var(--muted); }  /* light form controls on the light settings panel */
   .set-head {
     position: sticky; top: 0; z-index: 45;  /* stays above the colour and icon pickers when scrolling */
     background: var(--ground); color: var(--cream);
@@ -672,6 +685,19 @@
 </div>
 <canvas id="confetti" hidden></canvas>
 
+<div class="gate" id="gate" hidden>
+  <div class="gate-card" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+    <div class="gate-head">
+      <div><h2 id="gateTitle">Enter to play</h2><p>Fill this out, then pull the lever to spin.</p></div>
+      <button type="button" class="gate-x" id="gateClose" aria-label="Close the form">✕</button>
+    </div>
+    <div class="gate-body">
+      <iframe id="gateFrame" title="Sign-up form" allow="clipboard-write"></iframe>
+      <div class="gate-done" id="gateDone" hidden><b>You're in!</b><span>Pull the lever to spin.</span></div>
+    </div>
+  </div>
+</div>
+
 <div class="sheet pin-sheet" id="pinSheet" hidden>
   <div class="pin-box">
     <h2>Staff PIN</h2>
@@ -737,6 +763,24 @@
       <div class="row-actions">
         <button class="btn danger" id="resetBtn" type="button">Reset counts</button>
         <span class="help" id="resetHelp" style="font-size:13px"></span>
+      </div>
+    </section>
+
+    <section>
+      <h3>Sign-up form</h3>
+      <p class="help">When this is on, visitors fill out your sign-up form before every spin. Tapping the machine or lever opens the form; once it's submitted, they get one spin, and the form resets for the next person. A “Try again” result lets the same visitor re-spin without refilling it. The form only shows in the iPad kiosk app. The claude.ai preview can't display other websites.</p>
+      <div class="fields">
+        <div class="field"><span class="lbl">Form</span><label class="chk"><input id="fGateOn" type="checkbox"> Require the form before each spin</label></div>
+        <div class="field"><label for="fGateUrl">Form link</label><input id="fGateUrl" type="url" inputmode="url" placeholder="https://your-form-tool.com/your-form"><span class="sub" id="gateUrlNote"></span></div>
+        <div class="field"><label for="fGateDetect">Unlock the spin when</label>
+          <select id="fGateDetect">
+            <option value="auto">The form says it was submitted (recommended)</option>
+            <option value="load">The form moves to its thank-you page</option>
+            <option value="message">The form redirects to the kiosk thank-you page only</option>
+          </select>
+          <span class="sub">For the most reliable unlock, set your form's “redirect after submit” to <code id="thanksUrl"></code></span>
+        </div>
+        <div class="field"><span class="lbl">Try it</span><div class="row-actions"><button class="btn" id="gateTest" type="button">Open the form now</button></div></div>
       </div>
     </section>
 
@@ -814,7 +858,7 @@
     lede: "Tap the wheel or hit spin. One spin per visitor — good luck!",
     slotTitle: "Play to *win*",
     slotLede: "Tap the machine or pull the lever. Good luck!",
-    mode: "wheel", minSlices: 12, duration: 6.5, showOut: false, sound: true, autoFs: true, pin: "1234", logo: null,
+    mode: "wheel", gateOn: false, gateUrl: "", gateDetect: "auto", minSlices: 12, duration: 6.5, showOut: false, sound: true, autoFs: true, pin: "1234", logo: null,
     prizes: [
       { id: "p1", name: "KWK Hoodie", color: "purple", weight: 1, stock: 10, again: false },
       { id: "p2", name: "Tote Bag", color: "volt", weight: 5, stock: 60, again: false },
@@ -846,6 +890,8 @@
       imgData: typeof p.imgData === "string" && p.imgData.startsWith("data:image/") ? p.imgData : null,
     })) : [];
     if (out.mode !== "slots") out.mode = "wheel";
+    out.gateOn = !!out.gateOn; out.gateUrl = typeof out.gateUrl === "string" ? out.gateUrl.trim() : "";
+    if (!["auto", "load", "message"].includes(out.gateDetect)) out.gateDetect = "auto";
     return out;
   }
   function normTally(t) {
@@ -1257,6 +1303,7 @@
     lastInteract = performance.now();
     keepAwake(); audio();
     if (spin || pendingResult || !$("result").hidden) return;
+    if (gateActive() && !gateUnlocked) { openGate(); return; }  // sign-up form first
     let pool = eligible();
     if (!pool.length) { notice("> No prizes left to win. Open settings to restock."); return; }
     // A re-spin after "Spin again" always lands on a real prize, so nobody gets stuck in a loop.
@@ -1300,6 +1347,7 @@
     const wasSlots = !!(spin && spin.slots);
     spin = null;
     lastWasAgain = !!prize.again;
+    if (!prize.again) gateUnlocked = false;  // next visitor fills the form again ("Spin again" keeps the same turn)
     if (wasSlots && !prize.again) markHits();
     if (wasSlots) setTimeout(() => updateLeds(prize.again ? "Try again" : prize.name), 0);
     rot = ((rot % 360) + 360) % 360;
@@ -1327,8 +1375,7 @@
     $("result").hidden = false;
     winSound(again);
     if (!again && !reduceMotion) confetti();
-    clearTimeout(resultTimer);
-    resultTimer = setTimeout(closeResult, 20000);
+    clearTimeout(resultTimer);  // stays up until staff tap "Next player"
   }
   function closeResult() {
     clearTimeout(resultTimer);
@@ -1724,6 +1771,62 @@
     state.cfg.mode = b.dataset.mode; applyCfg(); cfgChanged({ redraw: false }); renderModes(); renderCopyFields();
   });
 
+  // ---------- Sign-up form gate ----------
+  // Other websites can't be shown inside claude.ai, so the form works in the kiosk app only.
+  const canEmbed = !window.claude;
+  let gateUnlocked = false, gateOpenNow = false, gateLoads = 0, gateDoneT = null;
+  const gateActive = () => canEmbed && state.cfg.gateOn && /^https?:\/\//i.test(state.cfg.gateUrl);
+  const thanksUrl = () => new URL("thanks.html", location.href).href;
+  function openGate(test) {
+    if (!/^https?:\/\//i.test(state.cfg.gateUrl)) { notice("> Add the form link in settings first."); return; }
+    gateOpenNow = true; gateLoads = 0; clearTimeout(gateDoneT);
+    $("gateDone").hidden = true;
+    const f = $("gateFrame");
+    f.src = "about:blank";
+    setTimeout(() => { f.src = state.cfg.gateUrl; }, 30);  // fresh, empty form every time
+    $("gate").hidden = false; $("gate").dataset.test = test ? "1" : "";
+  }
+  function closeGate() {
+    gateOpenNow = false; clearTimeout(gateDoneT);
+    $("gate").hidden = true; $("gateFrame").src = "about:blank";
+    lastInteract = performance.now();
+  }
+  function formDone() {
+    if (!gateOpenNow || !$("gateDone").hidden) return;
+    if ($("gate").dataset.test !== "1") gateUnlocked = true;
+    $("gateDone").hidden = false;
+    gateDoneT = setTimeout(closeGate, 1600);
+  }
+  $("gateClose").addEventListener("click", closeGate);
+  $("gateFrame").addEventListener("load", () => {
+    if (!gateOpenNow || $("gateFrame").src === "about:blank") return;
+    gateLoads++;
+    if (state.cfg.gateDetect === "load" && gateLoads >= 2) formDone();   // a second page = the thank-you page
+  });
+  window.addEventListener("message", (e) => {
+    if (!gateOpenNow) return;
+    const d = e.data;
+    if (e.origin === location.origin && d && d.kwk === "form-done") return formDone();   // our thanks.html
+    if (state.cfg.gateDetect !== "auto") return;
+    let str = ""; try { str = typeof d === "string" ? d : JSON.stringify(d); } catch {}
+    // "form submitted" signals sent by common form tools (Typeform, Jotform, HubSpot, Tally, Fillout, and others)
+    if (/form[-_ ]?submit|submission[-_ ]?complete|onFormSubmitted|formSubmitted|form_submission|"event":"submit"|Tally\.FormSubmitted/i.test(str)) formDone();
+  });
+  $("fGateOn").addEventListener("change", (e) => { state.cfg.gateOn = e.target.checked; cfgChanged({ redraw: false }); renderGateNote(); });
+  $("fGateUrl").addEventListener("input", (e) => { state.cfg.gateUrl = e.target.value.trim(); cfgChanged({ redraw: false }); renderGateNote(); });
+  $("fGateDetect").addEventListener("change", (e) => { state.cfg.gateDetect = e.target.value; cfgChanged({ redraw: false }); });
+  $("gateTest").addEventListener("click", () => { if (!canEmbed) { renderGateNote(); return; } openGate(true); });
+  function renderGateNote() {
+    const n = $("gateUrlNote");
+    if (!canEmbed) n.textContent = "Preview only: the form shows in the iPad kiosk app, not here in claude.ai.";
+    else if (state.cfg.gateOn && !/^https?:\/\//i.test(state.cfg.gateUrl)) n.textContent = "Paste the full link, starting with https://";
+    else n.textContent = "";
+  }
+  function renderGateSettings() {
+    $("fGateOn").checked = state.cfg.gateOn; $("fGateUrl").value = state.cfg.gateUrl; $("fGateDetect").value = state.cfg.gateDetect;
+    $("thanksUrl").textContent = thanksUrl(); renderGateNote();
+  }
+
   // ---------- Main loop ----------
   let lastFrame = performance.now();
   function frame(now) {
@@ -1852,7 +1955,7 @@
     $("fAutoFs").checked = c.autoFs !== false;
     $("fPin").value = c.pin || "";
     renderHub($("logoPrev"), false);
-    renderModes();
+    renderModes(); renderGateSettings();
     renderPrizeRows(); renderStats(); $("sim").innerHTML = "";
   }
 
@@ -2030,8 +2133,7 @@
   onTap($("slot"), () => { if (!suppressClick) startSpin(); });
   $("slot").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); startSpin(); } });
   $("wheel").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); startSpin(); } });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("result").hidden) closeResult(); });
-  $("result").addEventListener("click", (e) => { if (e.target === $("result")) closeResult(); });
+
   ["pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, () => { lastInteract = performance.now(); }, { passive: true }));
 
   let resizeT = null;
