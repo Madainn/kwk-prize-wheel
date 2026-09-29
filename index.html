@@ -60,7 +60,7 @@
   html { background: var(--ground-deep); }
   /* iPad Home Screen app: iOS draws the page under the status bar but still sizes the screen without it,
      which leaves a strip at the bottom. Stretch every full-screen layer down by that amount. */
-  html.pwa .stage, html.pwa .result, html.pwa #confetti, html.pwa .sheet { bottom: calc(-1 * env(safe-area-inset-top, 0px)); }
+  html.pwa .stage, html.pwa .result, html.pwa #confetti, html.pwa .sheet, html.pwa .gate { bottom: calc(-1 * var(--pwa-gap, 0px)); }
   html.pwa #confetti { height: auto; }
   body {
     background: var(--ground-deep);  /* matches the felt's darker edge in case any sliver shows */
@@ -333,7 +333,6 @@
   @keyframes toastIn { from { transform: translate(-50%, -30px); opacity: 0; } }
   /* sign-up form gate */
   .gate { position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; background: rgba(1, 20, 15, .82); padding-inline: 16px; padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)); animation: fade .2s ease-out; }
-  html.pwa .gate { bottom: calc(-1 * env(safe-area-inset-top, 0px)); }
   .gate-card { width: min(860px, 100%); height: min(88vh, 1100px); display: flex; flex-direction: column; border-radius: 22px; overflow: hidden; background: var(--cream); box-shadow: 0 0 0 4px var(--volt), 0 0 40px rgba(227, 255, 0, .35), 0 20px 60px rgba(0, 0, 0, .5); }
   .gate-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; background: var(--ground); color: var(--cream); }
   .gate-head h2 { margin: 0; font-family: var(--sign); font-weight: 900; text-transform: uppercase; letter-spacing: .03em; font-size: clamp(26px, 4vw, 38px); line-height: 1; }
@@ -775,6 +774,13 @@
       <div class="fields">
         <div class="field"><span class="lbl">Form</span><label class="chk"><input id="fGateOn" type="checkbox"> Require the form before each spin</label></div>
         <div class="field"><label for="fGateUrl">Form link</label><input id="fGateUrl" type="url" inputmode="url" placeholder="https://your-form-tool.com/your-form"><span class="sub" id="gateUrlNote"></span></div>
+        <div class="field"><label for="fGateMode">Show the form</label>
+          <select id="fGateMode">
+            <option value="popup">In a pop-up over the machine (best in the Home Screen app)</option>
+            <option value="page">As a full page (works everywhere, including Safari tabs)</option>
+          </select>
+          <span class="sub">Full page needs your form to redirect to the thank-you page below, which brings visitors back to the machine, unlocked.</span>
+        </div>
         <div class="field"><label for="fGateDetect">Unlock the spin when</label>
           <select id="fGateDetect">
             <option value="auto">The form says it was submitted (recommended)</option>
@@ -860,7 +866,7 @@
     lede: "Tap the wheel or hit spin. One spin per visitor — good luck!",
     slotTitle: "Play to *win*",
     slotLede: "Tap the machine or pull the lever. Good luck!",
-    mode: "wheel", gateOn: false, gateUrl: "", gateDetect: "auto", minSlices: 12, duration: 6.5, showOut: false, sound: true, pin: "1234", logo: null,
+    mode: "wheel", gateOn: false, gateUrl: "", gateDetect: "auto", gateMode: "popup", minSlices: 12, duration: 6.5, showOut: false, sound: true, pin: "1234", logo: null,
     prizes: [
       { id: "p1", name: "KWK Hoodie", color: "purple", weight: 1, stock: 10, again: false },
       { id: "p2", name: "Tote Bag", color: "volt", weight: 5, stock: 60, again: false },
@@ -894,6 +900,7 @@
     if (out.mode !== "slots") out.mode = "wheel";
     out.gateOn = !!out.gateOn; out.gateUrl = typeof out.gateUrl === "string" ? out.gateUrl.trim() : "";
     if (!["auto", "load", "message"].includes(out.gateDetect)) out.gateDetect = "auto";
+    if (out.gateMode !== "page") out.gateMode = "popup";
     return out;
   }
   function normTally(t) {
@@ -921,6 +928,17 @@
   };
   const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches;
   if (standalone) document.documentElement.classList.add("pwa");
+  // The Home Screen app reports a screen that's shorter than the real one (by the status bar), so full-screen
+  // layers stop short at the bottom. Measure the shortfall and stretch them by exactly that much.
+  function measurePwaGap() {
+    if (!standalone) return;
+    const portrait = matchMedia("(orientation: portrait)").matches;
+    const full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+    const gap = Math.round(full - window.innerHeight);
+    document.documentElement.style.setProperty("--pwa-gap", (gap > 0 && gap < 90 ? gap : 0) + "px");
+  }
+  measurePwaGap();
+  addEventListener("resize", measurePwaGap); addEventListener("orientationchange", () => setTimeout(measurePwaGap, 300));
 
   // ---------- Cloud sync (artifact db) ----------
   let db = null, cfgRef = null, tallyRef = null;
@@ -1781,6 +1799,7 @@
   const thanksUrl = () => new URL("thanks.html", location.href).href;
   function openGate(test) {
     if (!/^https?:\/\//i.test(state.cfg.gateUrl)) { notice("> Add the form link in settings first."); return; }
+    if (state.cfg.gateMode === "page" && !test) { saveLocal(); location.href = state.cfg.gateUrl; return; }  // thanks.html brings them back unlocked
     gateOpenNow = true; gateLoads = 0; clearTimeout(gateDoneT);
     $("gateDone").hidden = true;
     const f = $("gateFrame");
@@ -1832,6 +1851,7 @@
   $("fGateOn").addEventListener("change", (e) => { state.cfg.gateOn = e.target.checked; cfgChanged({ redraw: false }); renderGateNote(); });
   $("fGateUrl").addEventListener("input", (e) => { state.cfg.gateUrl = e.target.value.trim(); cfgChanged({ redraw: false }); renderGateNote(); });
   $("fGateDetect").addEventListener("change", (e) => { state.cfg.gateDetect = e.target.value; cfgChanged({ redraw: false }); });
+  $("fGateMode").addEventListener("change", (e) => { state.cfg.gateMode = e.target.value; cfgChanged({ redraw: false }); });
   $("gateTest").addEventListener("click", () => { if (!canEmbed) { renderGateNote(); return; } openGate(true); });
   function renderGateNote() {
     const n = $("gateUrlNote");
@@ -1840,7 +1860,7 @@
     else n.textContent = "";
   }
   function renderGateSettings() {
-    $("fGateOn").checked = state.cfg.gateOn; $("fGateUrl").value = state.cfg.gateUrl; $("fGateDetect").value = state.cfg.gateDetect;
+    $("fGateOn").checked = state.cfg.gateOn; $("fGateUrl").value = state.cfg.gateUrl; $("fGateDetect").value = state.cfg.gateDetect; $("fGateMode").value = state.cfg.gateMode;
     $("thanksUrl").textContent = thanksUrl(); renderGateNote();
   }
 
