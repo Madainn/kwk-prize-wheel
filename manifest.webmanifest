@@ -3,10 +3,10 @@
   "short_name": "KWK Prizes",
   "start_url": "./",
   "scope": "./",
-  "display": "fullscreen",
+  "display": "standalone",
   "orientation": "any",
-  "background_color": "#015F45",
-  "theme_color": "#015F45",
+  "background_color": "#013D2D",
+  "theme_color": "#013D2D",
   "icons": [
     {
       "src": "icon-180.png",

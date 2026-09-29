@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="KWK Prizes">
-<meta name="theme-color" content="#015F45">
+<meta name="theme-color" content="#013D2D">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-512.png">
 <style>
-  html { box-sizing: border-box; color-scheme: dark; background: #013D2D; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html { box-sizing: border-box; color-scheme: dark; background: #013D2D; }
   html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
   body { margin: 0; background: #013D2D; font: 14px system-ui, -apple-system, sans-serif; }
   img { max-width: 100%; }
@@ -58,10 +58,6 @@
   [hidden] { display: none !important; }
   html, body { height: 100%; }
   html { background: var(--ground-deep); }
-  /* iPad Home Screen app: iOS draws the page under the status bar but still sizes the screen without it,
-     which leaves a strip at the bottom. Stretch every full-screen layer down by that amount. */
-  html.pwa .stage, html.pwa .result, html.pwa #confetti, html.pwa .sheet, html.pwa .gate { top: 0; bottom: auto; height: var(--screen-h, 100%); }
-  html.pwa #confetti { height: auto; }
   body {
     background: var(--ground-deep);  /* matches the felt's darker edge in case any sliver shows */
     color: var(--cream);
@@ -929,16 +925,6 @@
   };
   const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches;
   if (standalone) document.documentElement.classList.add("pwa");
-  // The Home Screen app gives the page a viewport shorter than the real screen (by the status bar), and the
-  // number it reports can change after launch. So size full-screen layers to the physical screen instead.
-  function measurePwaGap() {
-    if (!standalone) return;
-    const portrait = matchMedia("(orientation: portrait)").matches;
-    const h = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
-    document.documentElement.style.setProperty("--screen-h", h + "px");
-  }
-  measurePwaGap();
-  matchMedia("(orientation: portrait)").addEventListener("change", () => { measurePwaGap(); setTimeout(measurePwaGap, 400); });
 
   // ---------- Cloud sync (artifact db) ----------
   let db = null, cfgRef = null, tallyRef = null;
