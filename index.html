@@ -1785,15 +1785,47 @@
   ["touchend", "pointerup", "click"].forEach((ev) => document.addEventListener(ev, unlockAudio, { capture: true, passive: true }));
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && actx && actx.state !== "running") actx.resume().catch(() => {}); });
   function pullLever() { const l = $("lever"); l.classList.remove("pull"); void l.offsetWidth; l.classList.add("pull"); }
-  function clunk() {
-    const a = audio(); if (!a) return;
+  function clunk(vol = 1) {
+    const a = audio(); if (!a || a.state !== "running") return;
     const t = a.currentTime, o = a.createOscillator(), g = a.createGain();
     o.type = "sine"; o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.09);
-    g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    g.gain.setValueAtTime(0.25 * vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
     o.connect(g).connect(a.destination); o.start(t); o.stop(t + 0.13);
   }
 
+  // Idle drift: while waiting, each reel wanders up or down at its own changing speed, and now and then
+  // eases onto a symbol with a soft click, rests, then drifts off again.
+  const idleReels = reels.map(() => ({ v: 0, target: 0, retarget: 0, settleAt: 0, settle: null, restUntil: 0 }));
+  const rnd = (a, b) => a + rand() * (b - a);
+  function stepIdleReels(dt, now) {
+    reels.forEach((r, i) => {
+      const L = r.items.length; if (!L) return;
+      const st = idleReels[i];
+      if (!st.retarget) { st.retarget = now + rnd(500, 2500); st.settleAt = now + rnd(6000, 16000); st.target = rnd(-0.9, 1.2); }
+      if (st.settle) {                                     // easing onto a symbol
+        const k = Math.min(1, (now - st.settle.t0) / st.settle.ms);
+        r.pos = st.settle.from + (st.settle.to - st.settle.from) * (1 - Math.pow(1 - k, 3));
+        if (k >= 1) { st.settle = null; st.v = 0; clunk(0.35); st.restUntil = now + rnd(700, 2200); st.settleAt = now + rnd(9000, 22000); st.retarget = now; }
+        return;
+      }
+      if (now < st.restUntil) return;                      // resting on a symbol
+      if (now > st.retarget) {                             // pick a new mood: faster, slower, or the other way
+        st.target = rand() < 0.15 ? 0 : rnd(-1.1, 1.4) * (rand() < 0.2 ? 2.2 : 1);
+        st.retarget = now + rnd(1500, 5000);
+      }
+      st.v += (st.target - st.v) * Math.min(1, dt / 700); // drift smoothly toward it (cells per second)
+      r.pos += st.v * dt / 1000;
+      if (now > st.settleAt && Math.abs(st.v) > 0.15) {   // occasionally come to rest on a symbol
+        const to = st.v > 0 ? Math.ceil(r.pos) : Math.floor(r.pos);
+        st.settle = { from: r.pos, to, t0: now, ms: Math.max(250, Math.abs(to - r.pos) / Math.abs(st.v) * 1600) };
+      }
+    });
+    paintReels();
+  }
+  function resetIdleReels() { idleReels.forEach((st) => { st.v = 0; st.settle = null; st.retarget = 0; st.restUntil = 0; }); }
+
   function startSlotSpin(prize) {
+    resetIdleReels();
     // What lands on the payline: three of the prize, or, for a "try again" prize, a near miss on the rarest prize.
     let targets = [prize, prize, prize];
     if (prize.again) {
@@ -2043,6 +2075,7 @@
     const attract = !spin && !pendingResult && $("result").hidden && $("settings").hidden && !reduceMotion;  // always drift while waiting
     const slotsOn = isSlots();
     if (spin) { if (spin.slots) stepSlots(now); else stepSpin(now); }
+    else if (slotsOn && attract && $("gate").hidden && !document.querySelector(".cell.hit")) stepIdleReels(dt, now);
     else if (attract && !slotsOn) rot += dt * 0.012;
     face.style.transform = `rotate(${rot}deg)`;
     const idx = slotsOn ? lastIdx : idxAtPointer();
