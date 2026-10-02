@@ -294,6 +294,10 @@
   @keyframes pop { from { transform: scale(.4); opacity: 0; } }
   .result .hint { color: var(--muted); font-size: clamp(15px, 1.6vw, 20px); margin: 0; }
   .result .again { font-size: clamp(20px, 2.4vw, 28px); padding: .5em 1.4em; }
+  .res-actions { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; align-items: center; }
+  .touch-btn { border: 3px solid var(--pink); border-radius: 999px; background: rgba(255, 153, 252, .12); color: var(--cream); font-family: var(--sign); font-weight: 900; text-transform: uppercase; letter-spacing: .04em; font-size: clamp(20px, 2.4vw, 28px); padding: .42em 1.3em; box-shadow: 0 0 24px rgba(255, 153, 252, .35); }
+  .touch-btn:active { transform: translateY(2px); }
+  .touch-btn[disabled] { opacity: .7; border-color: var(--mint); background: rgba(11, 217, 86, .12); box-shadow: none; }
   #confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 21; }
 
   /* ---------- Sheets (PIN + settings) ---------- */
@@ -687,7 +691,10 @@
     <p class="won" id="resWon">You won</p>
     <p class="prize" id="resPrize"></p>
     <p class="hint" id="resHint">Show this screen to a Kode With Klossy team member.</p>
-    <button class="spin-btn again" id="resClose" type="button">Next player</button>
+    <div class="res-actions">
+      <button class="touch-btn" id="resTouch" type="button" hidden>Stay in touch</button>
+      <button class="spin-btn again" id="resClose" type="button">Next player</button>
+    </div>
   </div>
 </div>
 <canvas id="confetti" hidden></canvas>
@@ -791,9 +798,15 @@
 
     <section>
       <h3>Sign-up form</h3>
-      <p class="help">When this is on, visitors fill out your sign-up form before every spin. Tapping the machine or lever opens the form; once it's submitted, they get one spin, and the form resets for the next person. A “Try again” result lets the same visitor re-spin without refilling it. The form only shows in the iPad kiosk app. The claude.ai preview can't display other websites.</p>
+      <p class="help">Show your sign-up form <b>after the spin</b> as an optional “Stay in touch” button on the win screen, or <b>before each spin</b> as a requirement to play (a “Try again” result re-spins without refilling it). Either way, the form opens instantly in a pop-up that visitors can close, and a fresh, empty copy is ready for the next person. The form only shows in the iPad kiosk app. The claude.ai preview can't display other websites.</p>
       <div class="fields">
-        <div class="field"><span class="lbl">Form</span><label class="chk"><input id="fGateOn" type="checkbox"> Require the form before each spin</label></div>
+        <div class="field"><span class="lbl">Form</span><label class="chk"><input id="fGateOn" type="checkbox"> Use the sign-up form</label></div>
+        <div class="field"><label for="fGateWhen">When to show it</label>
+          <select id="fGateWhen">
+            <option value="after">After the spin: a “Stay in touch” button on the win screen (optional)</option>
+            <option value="before">Before each spin: required to play</option>
+          </select>
+        </div>
         <div class="field"><label for="fGateUrl">Form link</label><input id="fGateUrl" type="url" inputmode="url" placeholder="https://your-form-tool.com/your-form"><span class="sub" id="gateUrlNote"></span></div>
         <div class="field"><label for="fGateMode">Show the form</label>
           <select id="fGateMode">
@@ -888,7 +901,7 @@
     lede: "Tap the wheel or hit spin. One spin per visitor — good luck!",
     slotTitle: "Play to *win*",
     slotLede: "Tap the machine or pull the lever. Good luck!",
-    mode: "wheel", gateOn: false, gateUrl: "", gateDetect: "auto", gateMode: "popup", minSlices: 12, duration: 6.5, showOut: false, sound: true, pin: "1234", logo: null,
+    mode: "wheel", gateOn: false, gateWhen: "after", gateUrl: "", gateDetect: "auto", gateMode: "popup", minSlices: 12, duration: 6.5, showOut: false, sound: true, pin: "1234", logo: null,
     prizes: [
       { id: "p1", name: "KWK Hoodie", color: "purple", weight: 1, stock: 10, again: false },
       { id: "p2", name: "Tote Bag", color: "volt", weight: 5, stock: 60, again: false },
@@ -923,6 +936,7 @@
     out.gateOn = !!out.gateOn; out.gateUrl = typeof out.gateUrl === "string" ? out.gateUrl.trim() : "";
     if (!["auto", "load", "message"].includes(out.gateDetect)) out.gateDetect = "auto";
     if (out.gateMode !== "page") out.gateMode = "popup";
+    if (out.gateWhen !== "before") out.gateWhen = "after";
     return out;
   }
   function normTally(t) {
@@ -1501,6 +1515,8 @@
     $("resPrize").textContent = again ? "Spin again!" : prize.name;
     $("resHint").textContent = again ? "Give it another go." : "Show this screen to a Kode With Klossy team member.";
     $("resClose").textContent = again ? "Spin again" : "Next player";
+    const tb = $("resTouch");
+    tb.hidden = again || !formAfterOn(); tb.disabled = false; tb.textContent = "Stay in touch";
     $("result").hidden = false;
     winSound(again);
     if (!again && !reduceMotion) confetti();
@@ -1906,7 +1922,10 @@
   // Other websites can't be shown inside claude.ai, so the form works in the kiosk app only.
   const canEmbed = !window.claude;
   let gateUnlocked = false, gateOpenNow = false, gateLoads = 0, gateDoneT = null;
-  const gateActive = () => canEmbed && state.cfg.gateOn && /^https?:\/\//i.test(state.cfg.gateUrl);
+  const formReady = () => canEmbed && state.cfg.gateOn && /^https?:\/\//i.test(state.cfg.gateUrl);
+  const gateActive = () => formReady() && state.cfg.gateWhen === "before";      // form required before spinning
+  const formAfterOn = () => formReady() && state.cfg.gateWhen === "after";      // optional "Stay in touch" on the win screen
+  let gatePurpose = "before";
   const thanksUrl = () => new URL("thanks.html", location.href).href;
   // Keep a blank copy of the form loading in the background, so the pop-up is instant when the lever is pulled.
   let gateReadyUrl = "", gateLoading = false, gateRefreshT = null, gatePreT = null;
@@ -1929,9 +1948,11 @@
     clearTimeout(gateRefreshT); gateRefreshT = setTimeout(() => { if (!gateOpenNow) preloadGate(true); }, 20 * 60 * 1000);
   }
   const preloadSoon = (ms = 400) => { clearTimeout(gatePreT); gatePreT = setTimeout(() => preloadGate(true), ms); };
-  function openGate(test) {
+  function openGate(test, purpose) {
+    gatePurpose = purpose || "before";
+    $("gateTitle").textContent = gatePurpose === "after" ? "Stay in touch" : "Enter to play";
     if (!/^https?:\/\//i.test(state.cfg.gateUrl)) { notice("> Add the form link in settings first."); return; }
-    if (state.cfg.gateMode === "page" && !test) { saveLocal(); location.href = state.cfg.gateUrl; return; }  // thanks.html brings them back unlocked
+    if (state.cfg.gateMode === "page" && !test) { saveLocal(); location.href = state.cfg.gateUrl; return; }  // thanks.html brings them back
     clearTimeout(gateDoneT);
     $("gateDone").hidden = true;
     const ready = gateReadyUrl === state.cfg.gateUrl || (gateLoading && $("gateFrame").getAttribute("src") === state.cfg.gateUrl);
@@ -1954,6 +1975,12 @@
   function formDone() {
     if (!gateOpenNow) return;
     const test = $("gate").dataset.test === "1";
+    if (gatePurpose === "after") {
+      closeGate();                                         // back to the win screen
+      const tb = $("resTouch"); if (!test) { tb.disabled = true; tb.textContent = "Thanks! ✓"; }
+      toast(test ? "Form works!" : "Thanks! We'll be in touch");
+      return;
+    }
     if (!test) gateUnlocked = true;
     closeGate();                                           // straight back to the machine, ready to spin
     toast(test ? "Form works! Spin unlocked in live mode" : "You're in! Pull the lever");
@@ -1963,12 +1990,16 @@
     const u = new URL(location.href);
     if (u.searchParams.has("kwkUnlocked")) {
       const when = Number(u.searchParams.get("kwkUnlocked")) || 0;
-      if (Math.abs(Date.now() - when) < 5 * 60 * 1000) { gateUnlocked = true; setTimeout(() => toast("You're in! Pull the lever"), 500); }
+      if (Math.abs(Date.now() - when) < 5 * 60 * 1000) {
+        if (state.cfg.gateWhen === "before") { gateUnlocked = true; setTimeout(() => toast("You're in! Pull the lever"), 500); }
+        else setTimeout(() => toast("Thanks! We'll be in touch"), 500);
+      }
       u.searchParams.delete("kwkUnlocked");
       history.replaceState(null, "", u.pathname + (u.search || "") + u.hash);
     }
   } catch {}
   $("gateClose").addEventListener("click", closeGate);
+  $("resTouch").addEventListener("click", (e) => { e.stopPropagation(); openGate(false, "after"); });
   $("gateFrame").addEventListener("load", () => {
     const f = $("gateFrame");
     if (!f.src || f.src === "about:blank" || f.getAttribute("src") === "about:blank") return;
@@ -1986,10 +2017,11 @@
     if (/form[-_ ]?submit|submission[-_ ]?complete|onFormSubmitted|formSubmitted|form_submission|"event":"submit"|Tally\.FormSubmitted/i.test(str)) formDone();
   });
   $("fGateOn").addEventListener("change", (e) => { state.cfg.gateOn = e.target.checked; cfgChanged({ redraw: false }); renderGateNote(); preloadSoon(); });
+  $("fGateWhen").addEventListener("change", (e) => { state.cfg.gateWhen = e.target.value; gateUnlocked = false; cfgChanged({ redraw: false }); });
   $("fGateUrl").addEventListener("input", (e) => { state.cfg.gateUrl = e.target.value.trim(); cfgChanged({ redraw: false }); renderGateNote(); preloadSoon(1200); });
   $("fGateDetect").addEventListener("change", (e) => { state.cfg.gateDetect = e.target.value; cfgChanged({ redraw: false }); });
   $("fGateMode").addEventListener("change", (e) => { state.cfg.gateMode = e.target.value; cfgChanged({ redraw: false }); preloadSoon(); });
-  $("gateTest").addEventListener("click", () => { if (!canEmbed) { renderGateNote(); return; } openGate(true); });
+  $("gateTest").addEventListener("click", () => { if (!canEmbed) { renderGateNote(); return; } openGate(true, state.cfg.gateWhen); });
   function renderGateNote() {
     const n = $("gateUrlNote");
     if (!canEmbed) n.textContent = "Preview only: the form shows in the iPad kiosk app, not here in claude.ai.";
@@ -1997,7 +2029,7 @@
     else n.textContent = "";
   }
   function renderGateSettings() {
-    $("fGateOn").checked = state.cfg.gateOn; $("fGateUrl").value = state.cfg.gateUrl; $("fGateDetect").value = state.cfg.gateDetect; $("fGateMode").value = state.cfg.gateMode;
+    $("fGateOn").checked = state.cfg.gateOn; $("fGateWhen").value = state.cfg.gateWhen; $("fGateUrl").value = state.cfg.gateUrl; $("fGateDetect").value = state.cfg.gateDetect; $("fGateMode").value = state.cfg.gateMode;
     $("thanksUrl").textContent = thanksUrl(); renderGateNote();
   }
 
