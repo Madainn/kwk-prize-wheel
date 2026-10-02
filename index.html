@@ -1365,10 +1365,24 @@
   function audio() {
     if (!state.cfg.sound) return null;
     try {
-      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-      if (actx.state === "suspended") actx.resume();
+      if (!actx) {
+        // Treat the game's sounds as media, so they still play when the iPad is in silent mode (iOS 17+).
+        try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch {}
+        actx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      // iOS also uses an "interrupted" state (e.g. after the Home Screen app was in the background).
+      if (actx.state !== "running") actx.resume().catch(() => {});
       return actx;
     } catch { return null; }
+  }
+  // Unlock sound for iOS: must happen inside a finished tap (touchend / click), and playing a silent blip
+  // in that moment is what actually switches audio on in the Home Screen app.
+  function unlockAudio() {
+    const a = audio(); if (!a) return;
+    try {
+      const b = a.createBuffer(1, 1, 22050), src = a.createBufferSource();
+      src.buffer = b; src.connect(a.destination); src.start(0);
+    } catch {}
   }
   let lastTick = 0;
   function tickSound() {
@@ -1748,8 +1762,10 @@
   // Fullscreen (and sound) can only be switched on from inside a real tap, so ask on touch-down and
   // touch-up anywhere on the game screen: the first touch goes fullscreen, and so does the next touch
   // after the iPad drops out of it. The spin itself never waits on this.
-  // Sound can only start from inside a real tap, so switch it on at the first touch on the game screen.
-  ["pointerdown", "touchend", "click"].forEach((ev) => $("stage").addEventListener(ev, () => { audio(); }, { capture: true, passive: true }));
+  // Sound can only start from inside a real tap, so switch it on with every finished tap anywhere in the app
+  // (the game, the win screen, the form pop-up's frame edge, settings).
+  ["touchend", "pointerup", "click"].forEach((ev) => document.addEventListener(ev, unlockAudio, { capture: true, passive: true }));
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && actx && actx.state !== "running") actx.resume().catch(() => {}); });
   function pullLever() { const l = $("lever"); l.classList.remove("pull"); void l.offsetWidth; l.classList.add("pull"); }
   function clunk() {
     const a = audio(); if (!a) return;
