@@ -797,16 +797,10 @@
     </section>
 
     <section>
-      <h3>Sign-up form</h3>
-      <p class="help">Show your sign-up form <b>after the spin</b> as an optional “Stay in touch” button on the win screen, or <b>before each spin</b> as a requirement to play (a “Try again” result re-spins without refilling it). Either way, the form opens instantly in a pop-up that visitors can close, and a fresh, empty copy is ready for the next person. The form only shows in the iPad kiosk app. The claude.ai preview can't display other websites.</p>
+      <h3>Stay in touch form</h3>
+      <p class="help">When this is on, the win screen shows a “Stay in touch” button next to “Next player.” Tapping it opens your sign-up form instantly in a pop-up that visitors can fill in or close. It's completely optional and never holds up a spin. A fresh, empty copy is ready for each new visitor. The form only shows in the iPad kiosk app. The claude.ai preview can't display other websites.</p>
       <div class="fields">
-        <div class="field"><span class="lbl">Form</span><label class="chk"><input id="fGateOn" type="checkbox"> Use the sign-up form</label></div>
-        <div class="field"><label for="fGateWhen">When to show it</label>
-          <select id="fGateWhen">
-            <option value="after">After the spin: a “Stay in touch” button on the win screen (optional)</option>
-            <option value="before">Before each spin: required to play</option>
-          </select>
-        </div>
+        <div class="field"><span class="lbl">Form</span><label class="chk"><input id="fGateOn" type="checkbox"> Show a “Stay in touch” button on the win screen</label></div>
         <div class="field"><label for="fGateUrl">Form link</label><input id="fGateUrl" type="url" inputmode="url" placeholder="https://your-form-tool.com/your-form"><span class="sub" id="gateUrlNote"></span></div>
         <div class="field"><label for="fGateMode">Show the form</label>
           <select id="fGateMode">
@@ -936,7 +930,7 @@
     out.gateOn = !!out.gateOn; out.gateUrl = typeof out.gateUrl === "string" ? out.gateUrl.trim() : "";
     if (!["auto", "load", "message"].includes(out.gateDetect)) out.gateDetect = "auto";
     if (out.gateMode !== "page") out.gateMode = "popup";
-    if (out.gateWhen !== "before") out.gateWhen = "after";
+    out.gateWhen = "after";   // the form is only ever an optional "Stay in touch" step after the spin
     return out;
   }
   function normTally(t) {
@@ -2017,7 +2011,6 @@
     if (/form[-_ ]?submit|submission[-_ ]?complete|onFormSubmitted|formSubmitted|form_submission|"event":"submit"|Tally\.FormSubmitted/i.test(str)) formDone();
   });
   $("fGateOn").addEventListener("change", (e) => { state.cfg.gateOn = e.target.checked; cfgChanged({ redraw: false }); renderGateNote(); preloadSoon(); });
-  $("fGateWhen").addEventListener("change", (e) => { state.cfg.gateWhen = e.target.value; gateUnlocked = false; cfgChanged({ redraw: false }); });
   $("fGateUrl").addEventListener("input", (e) => { state.cfg.gateUrl = e.target.value.trim(); cfgChanged({ redraw: false }); renderGateNote(); preloadSoon(1200); });
   $("fGateDetect").addEventListener("change", (e) => { state.cfg.gateDetect = e.target.value; cfgChanged({ redraw: false }); });
   $("fGateMode").addEventListener("change", (e) => { state.cfg.gateMode = e.target.value; cfgChanged({ redraw: false }); preloadSoon(); });
@@ -2029,7 +2022,7 @@
     else n.textContent = "";
   }
   function renderGateSettings() {
-    $("fGateOn").checked = state.cfg.gateOn; $("fGateWhen").value = state.cfg.gateWhen; $("fGateUrl").value = state.cfg.gateUrl; $("fGateDetect").value = state.cfg.gateDetect; $("fGateMode").value = state.cfg.gateMode;
+    $("fGateOn").checked = state.cfg.gateOn; $("fGateUrl").value = state.cfg.gateUrl; $("fGateDetect").value = state.cfg.gateDetect; $("fGateMode").value = state.cfg.gateMode;
     $("thanksUrl").textContent = thanksUrl(); renderGateNote();
   }
 
